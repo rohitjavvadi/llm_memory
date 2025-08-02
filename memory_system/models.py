@@ -118,16 +118,39 @@ class MemoryCategory:
     @classmethod
     def categorize_content(cls, content: str) -> str:
         content_lower = content.lower()
-        if any(word in content_lower for word in ['name', 'age', 'live', 'from', 'born']):
+        
+        # Personal information
+        if any(word in content_lower for word in ['name', 'age', 'live', 'from', 'born', 'family', 'married', 'single']):
             return cls.PERSONAL_INFO
-        if any(word in content_lower for word in ['work', 'job', 'company', 'team', 'project']):
+            
+        # Work information
+        if any(word in content_lower for word in ['work', 'job', 'company', 'team', 'project', 'career', 'office', 'colleague', 'manager', 'employee']):
             return cls.WORK_INFO
-        if any(word in content_lower for word in ['prefer', 'like', 'favorite', 'enjoy']):
-            return cls.PREFERENCES
-        if any(word in content_lower for word in ['know', 'skill', 'experience', 'expert', 'good at']):
+            
+        # Skills and expertise
+        if any(word in content_lower for word in ['know', 'skill', 'experience', 'expert', 'good at', 'proficient', 'learning', 'studied']):
             return cls.SKILLS
-        if any(word in content_lower for word in ['want', 'goal', 'plan', 'hope', 'trying to']):
+            
+        # Goals and aspirations
+        if any(word in content_lower for word in ['want', 'goal', 'plan', 'hope', 'trying to', 'aim', 'aspire', 'dream']):
             return cls.GOALS
-        if any(word in content_lower for word in ['use', 'tool', 'software', 'app', 'platform']):
+            
+        # Tools and software (expanded with entertainment and productivity apps)
+        tool_keywords = [
+            # Development tools
+            'use', 'tool', 'software', 'app', 'platform', 'program', 'application',
+            # Entertainment apps
+            'spotify', 'netflix', 'youtube', 'discord', 'twitch', 'instagram', 'tiktok',
+            # Productivity apps  
+            'notion', 'slack', 'teams', 'zoom', 'gmail', 'outlook', 'calendar',
+            # Development specific
+            'vscode', 'github', 'git', 'docker', 'aws', 'python', 'javascript'
+        ]
+        if any(word in content_lower for word in tool_keywords):
             return cls.TOOLS
+            
+        # Preferences (check after tools to avoid conflicts)
+        if any(word in content_lower for word in ['prefer', 'like', 'favorite', 'enjoy', 'love', 'hate', 'dislike']):
+            return cls.PREFERENCES
+            
         return cls.OTHER

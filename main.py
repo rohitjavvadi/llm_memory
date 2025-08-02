@@ -10,6 +10,7 @@ from memory_system import (
     MemoryExtractRequest,
     MemorySearchRequest,
     MemoryDeleteRequest,
+    MemoryResponse,
     MemoryListResponse,
     ExtractionResult,
     SearchResult
@@ -118,8 +119,20 @@ async def extract_memories(request: MemoryExtractRequest):
         )
         
         if result["success"]:
+            # Convert memory objects to MemoryResponse format
+            extracted_memories = []
+            for memory_dict in result.get("memories", []):
+                extracted_memories.append(MemoryResponse(
+                    id=memory_dict["id"],
+                    content=memory_dict["content"],
+                    category=memory_dict["category"],
+                    confidence=memory_dict["confidence"],
+                    timestamp=memory_dict["timestamp"],
+                    tags=memory_dict["tags"]
+                ))
+            
             return ExtractionResult(
-                extracted_memories=[],  # Will be populated by the actual memories
+                extracted_memories=extracted_memories,
                 message=result["message"],
                 processing_time=result["processing_time"]
             )
@@ -144,8 +157,20 @@ async def search_memories(request: MemorySearchRequest):
         )
         
         if result["success"]:
+            # Convert memory objects to MemoryResponse format
+            search_memories = []
+            for memory_dict in result.get("memories", []):
+                search_memories.append(MemoryResponse(
+                    id=memory_dict["id"],
+                    content=memory_dict["content"],
+                    category=memory_dict["category"],
+                    confidence=memory_dict["confidence"],
+                    timestamp=memory_dict["timestamp"],
+                    tags=memory_dict["tags"]
+                ))
+            
             return SearchResult(
-                memories=[],  # Will be populated by actual memories
+                memories=search_memories,
                 query=result["query"],
                 search_time=result["search_time"],
                 total_found=result["total_found"]
@@ -226,8 +251,20 @@ async def get_user_memories(user_id: str, category: str = None, limit: int = Non
         )
         
         if result["success"]:
+            # Convert memory objects to MemoryResponse format
+            user_memories = []
+            for memory_dict in result.get("memories", []):
+                user_memories.append(MemoryResponse(
+                    id=memory_dict["id"],
+                    content=memory_dict["content"],
+                    category=memory_dict["category"],
+                    confidence=memory_dict["confidence"],
+                    timestamp=memory_dict["timestamp"],
+                    tags=memory_dict["tags"]
+                ))
+            
             return MemoryListResponse(
-                memories=[],  # Will be populated by actual memories
+                memories=user_memories,
                 total_count=result["total_count"],
                 user_id=user_id
             )

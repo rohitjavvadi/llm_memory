@@ -29,11 +29,28 @@ class MemorySystem:
         extracted_memories = []
         
         try:
-            memory_data_list = self.openai_client.extract_memories_from_text(message, user_id)
+            # Get recent memories for context
+            recent_memories = self._get_recent_memories_for_context(user_id, limit=5)
+            
+            memory_data_list = self.openai_client.extract_memories_from_text(message, user_id, recent_memories)
+            
+            # Handle memory updates if needed
+            if memory_data_list and len(memory_data_list) > 0:
+                memory_data = memory_data_list[0]  # Should only be one memory per message
+                
+                # Check if this is an UPDATE action that needs old memory deletion
+                if memory_data.get('_action') == 'UPDATE':
+                    memory_to_replace = memory_data.get('_memory_to_replace', '')
+                    if memory_to_replace:
+                        # Find and delete the old memory
+                        self._delete_conflicting_memory(user_id, memory_to_replace)
             
             for memory_data in memory_data_list:
+                # Clean up internal metadata before creating memory
+                clean_memory_data = {k: v for k, v in memory_data.items() if not k.startswith('_')}
+                
                 memory = self._create_memory_from_data(
-                    memory_data, user_id, conversation_id
+                    clean_memory_data, user_id, conversation_id
                 )
                 
                 if memory:
@@ -294,3 +311,64 @@ class MemorySystem:
             "conversation_id": memory.conversation_id,
             "tags": memory.tags
         }
+    
+    def _get_recent_memories_for_context(self, user_id: str, limit: int = 5) -> List[str]:
+        """
+        Get recent memories for context in decision making.
+        
+        Args:
+            user_id: User ID to get memories for
+            limit: Maximum number of recent memories to return
+            
+        Returns:
+            List of memory content strings for context
+        """
+        try:
+            # Get recent memories from SQL database
+            memories = self.db_manager.get_user_memories(user_id, limit=limit)
+            
+            # Return just the content for context
+            memory_contents = [memory.content for memory in memories]
+            
+            logger.info(f"Retrieved {len(memory_contents)} memories for context for user {user_id}")
+            return memory_contents
+            
+        except Exception as e:
+            logger.error(f"Error getting recent memories for context: {e}")
+            return []
+    
+    def _delete_conflicting_memory(self, user_id: str, memory_content_to_replace: str):
+        """
+        Find and delete a memory that conflicts with new information.
+        
+        Args:
+            user_id: User ID
+            memory_content_to_replace: Content of the memory to find and delete
+        """
+        try:
+            # Search for memories with similar content
+            user_memories = self.db_manager.get_user_memories(user_id, limit=20)
+            
+            # Find the memory that matches the content to replace
+            memory_to_delete = None
+            for memory in user_memories:
+                # Simple content matching - could be enhanced with similarity matching
+                if memory_content_to_replace.lower() in memory.content.lower() or memory.content.lower() in memory_content_to_replace.lower():
+                    memory_to_delete = memory
+                    break
+            
+            if memory_to_delete:
+                # Delete from both SQL and vector databases
+                reason = f"Replaced by new information"
+                sql_success = self.db_manager.delete_memory(memory_to_delete.id, user_id, reason)
+                vector_success = self.vector_db.delete_memory(memory_to_delete.id, user_id)
+                
+                if sql_success and vector_success:
+                    logger.info(f"Successfully deleted conflicting memory: '{memory_to_delete.content}'")
+                else:
+                    logger.error(f"Failed to delete conflicting memory: '{memory_to_delete.content}'")
+            else:
+                logger.warning(f"Could not find memory to replace: '{memory_content_to_replace}'")
+                
+        except Exception as e:
+            logger.error(f"Error deleting conflicting memory: {e}")

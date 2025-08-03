@@ -302,19 +302,58 @@ async def process_and_chat(request: MemoryExtractRequest):
         raise HTTPException(status_code=503, detail="Memory system not initialized")
     
     try:
-        # Step 1: Extract memories from the message
-        extraction_result = memory_system.process_message(
-            user_id=request.user_id,
-            message=request.message,
-            conversation_id=request.conversation_id
-        )
+        # Step 1: Classify the query intent
+        query_intent = memory_system.openai_client.classify_query_intent(request.message)
         
-        # Step 2: Search for relevant memories to enhance response
-        search_result = memory_system.search_memories(
-            user_id=request.user_id,
-            query=request.message,
-            limit=5
-        )
+        # Initialize default extraction result
+        extraction_result = {
+            "success": True,
+            "memories_extracted": 0,
+            "processing_time": 0
+        }
+        
+        # Step 2: Handle based on query intent
+        if query_intent == "general_chat":
+            # For general chat, generate conversational response without memory processing
+            general_response = memory_system.openai_client.generate_general_response(request.message)
+            search_result = {
+                "enhanced_response": general_response,
+                "memories": [],
+                "search_time": 0,
+                "search_method": "general_chat"
+            }
+            
+        elif query_intent == "memory_sharing":
+            # For memory sharing, extract memories first, then provide acknowledgment
+            extraction_result = memory_system.process_message(
+                user_id=request.user_id,
+                message=request.message,
+                conversation_id=request.conversation_id
+            )
+            
+            # Generate response acknowledging the stored information
+            if extraction_result["success"] and extraction_result["memories_extracted"] > 0:
+                search_result = {
+                    "enhanced_response": f"Got it! I'll remember that information. Thanks for sharing!",
+                    "memories": [],
+                    "search_time": 0,
+                    "search_method": "memory_storage"
+                }
+            else:
+                search_result = {
+                    "enhanced_response": "I understand your message.",
+                    "memories": [],
+                    "search_time": 0,
+                    "search_method": "fallback"
+                }
+            
+        else:  # memory_question
+            # For memory questions, search for relevant memories using enhanced search
+            search_result = memory_system.search_memories(
+                user_id=request.user_id,
+                query=request.message,
+                limit=5
+            )
         
         return {
             "extraction": {
@@ -325,7 +364,9 @@ async def process_and_chat(request: MemoryExtractRequest):
             "response": {
                 "enhanced_response": search_result.get("enhanced_response", "I understand your message."),
                 "memories_found": len(search_result.get("memories", [])),
-                "search_time": search_result.get("search_time", 0)
+                "search_time": search_result.get("search_time", 0),
+                "search_method": search_result.get("search_method", "unknown"),
+                "query_intent": query_intent
             },
             "message": "Message processed and response generated"
         }

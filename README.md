@@ -9,10 +9,13 @@ This system acts like a digital memory for AI conversations. When you chat with 
 ## Features
 
 - **Smart Memory Extraction**: Automatically identifies and stores important information from conversations
-- **Semantic Search**: Find relevant memories using natural language queries
+- **Intelligent Query Classification**: Distinguishes between personal memory questions, general chat, and information sharing
+- **Hybrid Search System**: Combines vector similarity search with text-based and category-based fallback searches
+- **Smart Answer Extraction**: Uses AI to pull specific answers from stored memories (e.g., extracts "Sarah" from "Sarah works at Tech Corp" when asked "What's my name?")
 - **Dual Storage**: Uses both SQL database for structured data and vector database for similarity search
 - **Memory Management**: Intelligently updates or replaces outdated information
 - **Category Organization**: Automatically categorizes memories (tools, preferences, personal info, work, etc.)
+- **Natural Conversation**: Handles both memory-related queries and general conversation seamlessly
 - **RESTful API**: Clean HTTP endpoints for integration with other applications
 - **Chat Interface**: Simple Streamlit-based web UI for testing and interaction
 
@@ -51,17 +54,27 @@ This system acts like a digital memory for AI conversations. When you chat with 
 
 ## How to Use
 
-### Sharing Information
-Tell the AI about yourself and it will remember:
-- "I use VS Code for programming"
-- "I prefer dark mode themes"
-- "My name is Sarah and I work at Tech Corp"
+The system intelligently handles three types of interactions:
 
-### Asking Questions
-Query your stored memories:
-- "What coding tools do I use?"
-- "What are my preferences?"
-- "What do you remember about my work?"
+### 💬 General Conversation
+Chat naturally with the AI:
+- "Hi there!" → "Hi! How can I help you today?"
+- "How's the weather?" → General conversational response
+
+### 📝 Sharing Information  
+Tell the AI about yourself and it will remember:
+- "I use VS Code for programming" → "Got it! I'll remember that information."
+- "I prefer dark mode themes" → Stores your preference
+- "My name is Sarah and I work at Tech Corp" → Remembers both your name and workplace
+
+### 🔍 Asking About Your Information
+Query your stored memories with personal questions:
+- "What tool do I use for coding?" → "You use VS Code for programming."
+- "What is my name?" → "Your name is Sarah."
+- "Where do I work?" → "You work at Tech Corp."
+- "What are my preferences?" → Lists your stored preferences
+
+The system automatically knows whether you're asking about your personal information or having a general conversation!
 
 ### API Endpoints
 - `POST /process-and-chat` - Main endpoint for chat with memory
@@ -81,8 +94,8 @@ Query your stored memories:
 ## Limitations
 
 - **API Dependency**: Requires active OpenAI API connection and consumes tokens for all operations, which can become costly with heavy usage
-- **Memory Quality**: The system may occasionally store irrelevant information or miss important details, as it relies on AI interpretation of conversation context
-- **General Query Handling**: Currently focuses on basic memory-related responses and requires further development to handle general conversational queries and broader knowledge and memory questions effectively
+- **Memory Quality**: The system may occasionally store irrelevant information or miss important details, as it relies on AI interpretation of conversation context  
+- **Complex Memory Relationships**: Currently doesn't establish connections between related memories or handle complex multi-part information effectively
 
 ## Development
 
@@ -94,5 +107,15 @@ The system is structured as a Python package with clear separation of concerns:
 - `main.py` - FastAPI application
 - `chatbot_ui.py` - Streamlit interface
 
+## Recent Improvements
+
+This system has been enhanced with several key improvements:
+
+- **Hybrid Search Strategy**: No more "I don't have any memories related to that query" responses - the system now uses multiple search methods to find your information
+- **Smart Query Classification**: Automatically distinguishes between personal questions, general chat, and information sharing
+- **Intelligent Answer Extraction**: Pulls specific answers from stored memories instead of just listing what it remembers
+- **Rule-Based Fallbacks**: Uses pattern recognition to catch common question types that AI classification might miss
+
 ## Contributing
 
+This is a functional prototype system that demonstrates advanced memory capabilities for AI assistants. The modular architecture makes it easy to extend functionality or integrate with other systems. Feel free to explore, modify, and improve the codebase!

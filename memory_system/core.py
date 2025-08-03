@@ -81,28 +81,33 @@ class MemorySystem:
         start_time = datetime.now()
         
         try:
-            # Generate embedding for the query
-            query_embedding = self.openai_client.generate_embedding(query)
-            if not query_embedding:
-                return {
-                    "success": False,
-                    "error": "Failed to generate query embedding",
-                    "memories": []
-                }
+            # Step 1: Try vector search first
+            memories = self._vector_search_memories(user_id, query, limit)
+            search_method = "vector"
             
-            # Search in vector database
-            vector_results = self.vector_db.search_memories(
-                query_embedding, user_id, limit
-            )
+            # Step 2: If vector search finds few/no results, try text-based fallback
+            if len(memories) < 2:  # Fallback if we find less than 2 memories
+                text_memories = self._text_search_memories(user_id, query, limit)
+                
+                # Combine results, avoiding duplicates
+                existing_ids = {m['id'] for m in memories}
+                for text_memory in text_memories:
+                    if text_memory['id'] not in existing_ids:
+                        text_memory['similarity'] = 0.5  # Default similarity for text search
+                        memories.append(text_memory)
+                
+                if text_memories:
+                    search_method = "hybrid"
             
-            # Get full memory details from SQL database
-            memories = []
-            for result in vector_results:
-                memory = self.db_manager.get_memory(result['id'], user_id)
-                if memory:
-                    memory_dict = self._memory_to_dict(memory)
-                    memory_dict['similarity'] = result['similarity']
-                    memories.append(memory_dict)
+            # Step 3: If still no results, try category-based search for specific question types
+            if len(memories) == 0:
+                category_memories = self._category_search_memories(user_id, query, limit)
+                memories.extend(category_memories)
+                if category_memories:
+                    search_method = "category"
+            
+            # Limit final results
+            memories = memories[:limit]
             
             # Generate enhanced response
             memory_contents = [m['content'] for m in memories]
@@ -118,7 +123,8 @@ class MemorySystem:
                 "memories": memories,
                 "enhanced_response": enhanced_response,
                 "search_time": round(search_time, 2),
-                "total_found": len(memories)
+                "total_found": len(memories),
+                "search_method": search_method
             }
             
         except Exception as e:
@@ -128,6 +134,112 @@ class MemorySystem:
                 "error": str(e),
                 "memories": []
             }
+    
+    def _vector_search_memories(self, user_id: str, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Vector-based semantic search (original method)."""
+        try:
+            # Generate embedding for the query
+            query_embedding = self.openai_client.generate_embedding(query)
+            if not query_embedding:
+                return []
+            
+            # Search in vector database
+            vector_results = self.vector_db.search_memories(
+                query_embedding, user_id, limit
+            )
+            
+            # Get full memory details from SQL database
+            memories = []
+            for result in vector_results:
+                memory = self.db_manager.get_memory(result['id'], user_id)
+                if memory:
+                    memory_dict = self._memory_to_dict(memory)
+                    memory_dict['similarity'] = result['similarity']
+                    memories.append(memory_dict)
+            
+            logger.info(f"Vector search found {len(memories)} memories for: {query}")
+            return memories
+            
+        except Exception as e:
+            logger.error(f"Error in vector search: {e}")
+            return []
+    
+    def _text_search_memories(self, user_id: str, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Text-based keyword search as fallback."""
+        try:
+            # Extract keywords from query for text search
+            keywords = self._extract_search_keywords(query)
+            
+            memories = []
+            for keyword in keywords:
+                if len(keyword) > 2:  # Skip very short keywords
+                    keyword_memories = self.db_manager.search_memories_by_content(
+                        user_id, keyword, limit
+                    )
+                    for memory in keyword_memories:
+                        memory_dict = self._memory_to_dict(memory)
+                        if memory_dict not in memories:  # Avoid duplicates
+                            memories.append(memory_dict)
+            
+            # Limit results
+            memories = memories[:limit]
+            logger.info(f"Text search found {len(memories)} memories for: {query}")
+            return memories
+            
+        except Exception as e:
+            logger.error(f"Error in text search: {e}")
+            return []
+    
+    def _category_search_memories(self, user_id: str, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Category-based search for specific question types."""
+        try:
+            # Map common questions to categories
+            category_mappings = {
+                "name": "personal_info",
+                "work": "work_info", 
+                "job": "work_info",
+                "company": "work_info",
+                "tool": "tools",
+                "software": "tools",
+                "preference": "preferences",
+                "like": "preferences"
+            }
+            
+            query_lower = query.lower()
+            target_category = None
+            
+            for keyword, category in category_mappings.items():
+                if keyword in query_lower:
+                    target_category = category
+                    break
+            
+            if target_category:
+                memories = self.db_manager.get_user_memories(
+                    user_id, category=target_category, limit=limit
+                )
+                memory_dicts = [self._memory_to_dict(m) for m in memories]
+                logger.info(f"Category search found {len(memory_dicts)} memories in '{target_category}' for: {query}")
+                return memory_dicts
+            
+            return []
+            
+        except Exception as e:
+            logger.error(f"Error in category search: {e}")
+            return []
+    
+    def _extract_search_keywords(self, query: str) -> List[str]:
+        """Extract meaningful keywords from a search query."""
+        # Simple keyword extraction - could be enhanced with NLP
+        import re
+        
+        # Remove common question words and get meaningful terms
+        stop_words = {'what', 'is', 'my', 'do', 'i', 'where', 'how', 'can', 'the', 'a', 'an'}
+        
+        # Extract words, removing punctuation
+        words = re.findall(r'\b\w+\b', query.lower())
+        keywords = [word for word in words if word not in stop_words and len(word) > 2]
+        
+        return keywords
     
     def delete_memory_by_content(self, user_id: str, content_to_delete: str, 
                                 reason: str) -> Dict[str, Any]:

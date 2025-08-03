@@ -116,6 +116,3 @@ This system has been enhanced with several key improvements:
 - **Intelligent Answer Extraction**: Pulls specific answers from stored memories instead of just listing what it remembers
 - **Rule-Based Fallbacks**: Uses pattern recognition to catch common question types that AI classification might miss
 
-## Contributing
-
-This is a functional prototype system that demonstrates advanced memory capabilities for AI assistants. The modular architecture makes it easy to extend functionality or integrate with other systems. Feel free to explore, modify, and improve the codebase!
